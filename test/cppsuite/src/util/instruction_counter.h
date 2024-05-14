@@ -81,7 +81,7 @@ public:
         int ret = lambda();
 
         long long count;
-        size_t bytes_read = read(fd, &count, sizeof(count));
+        ssize_t bytes_read = read(fd, &count, sizeof(count));
         testutil_assert(bytes_read == sizeof(count));
 
         _total_time_taken += count;
