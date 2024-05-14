@@ -34,6 +34,13 @@ namespace test_harness {
 instruction_counter::instruction_counter(const std::string id, const std::string &test_name)
     : _id(id), _test_name(test_name), _it_count(0), _total_time_taken(0)
 {
+    memset(&_pe, 0, sizeof(_pe));
+    _pe.type = PERF_TYPE_HARDWARE;
+    _pe.size = sizeof(_pe);
+    _pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+    _pe.disabled = 1;
+    _pe.exclude_kernel = 1;
+    _pe.exclude_hv = 1;
 }
 
 void

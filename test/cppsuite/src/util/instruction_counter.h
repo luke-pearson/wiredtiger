@@ -61,15 +61,7 @@ public:
     int
     track(T lambda)
     {
-        struct perf_event_attr pe;
-        memset(&pe, 0, sizeof(pe));
-        pe.type = PERF_TYPE_HARDWARE;
-        pe.size = sizeof(pe);
-        pe.config = PERF_COUNT_HW_INSTRUCTIONS;
-        pe.disabled = 1;
-        pe.exclude_kernel = 1;
-        pe.exclude_hv = 1;
-        int fd = syscall(SYS_perf_event_open, &pe,
+        int fd = syscall(SYS_perf_event_open, &_pe,
           0,  // pid: calling process/thread
           -1, // cpu: any CPU
           -1, // groupd_fd: group with only 1 member
@@ -99,5 +91,6 @@ private:
     std::string _test_name;
     int _it_count;
     uint64_t _total_time_taken;
+    struct perf_event_attr _pe;
 };
 } // namespace test_harness
