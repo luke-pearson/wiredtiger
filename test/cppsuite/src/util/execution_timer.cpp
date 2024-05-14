@@ -26,8 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdint>
-
 #include "execution_timer.h"
 
 #include "src/component/metrics_writer.h"
@@ -44,18 +42,6 @@ execution_timer::append_stats()
     uint64_t avg = (uint64_t)_total_time_taken / _it_count;
     std::string stat = "{\"name\":\"" + _id + "\",\"value\":" + std::to_string(avg) + "}";
     metrics_writer::instance().add_stat(stat);
-}
-
-template <typename T>
-auto
-execution_timer::track(T lambda)
-{
-    auto _start_time = std::chrono::steady_clock::now();
-    int ret = lambda();
-    auto _end_time = std::chrono::steady_clock::now();
-    _total_time_taken += (_end_time - _start_time).count();
-    _it_count += 1;
-    return ret;
 }
 
 execution_timer::~execution_timer()

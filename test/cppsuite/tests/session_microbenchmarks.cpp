@@ -26,6 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "src/util/execution_timer.h"
 #include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/main/test.h"
@@ -73,12 +74,6 @@ public:
     }
 
     void
-    populate(database &, timestamp_manager *, configuration *, operation_tracker *) override final
-    {
-        logger::log_msg(LOG_WARN, "populate: nothing done");
-    }
-
-    void
     background_compact_operation(thread_worker *) override final
     {
         logger::log_msg(LOG_WARN, "background_compact_operation: nothing done");
@@ -91,9 +86,18 @@ public:
     }
 
     void
-    custom_operation(thread_worker *) override final
+    custom_operation(thread_worker *tc) override final
     {
-        logger::log_msg(LOG_WARN, "custom_operation: nothing done");
+        WT_SESSION wt_session = *(tc->session);
+        execution_timer bounded_next("begin_commit_transaction_ticks", test::_args.test_name);
+
+        bounded_next.track([&wt_session]() -> int {
+            for (int i = 0; i < 1000; i++) {
+                wt_session.begin_transaction(&wt_session, NULL);
+                wt_session.commit_transaction(&wt_session, NULL);
+            }
+            return 1000;
+        });
     }
 
     void

@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <fstream>
 
 #include "src/common/logger.h"
 #include "src/main/test.h"

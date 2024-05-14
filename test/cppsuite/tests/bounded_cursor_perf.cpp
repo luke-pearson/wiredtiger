@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/util/execution_timer.cpp"
+#include "src/util/execution_timer.h"
 #include "src/main/test.h"
 
 using namespace test_harness;
