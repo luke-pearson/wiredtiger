@@ -91,10 +91,15 @@ public:
         WT_SESSION wt_session = *(tc->session);
         execution_timer bounded_next("begin_commit_transaction_ticks", test::_args.test_name);
 
-        bounded_next.track([&wt_session]() -> int {
+        /* Get the collection to work on. */
+        testutil_assert(tc->collection_count == 1);
+
+        scoped_session &session = tc->session;
+
+        bounded_next.track([&wt_session, &session]() -> int {
             for (int i = 0; i < 1000; i++) {
-                wt_session.begin_transaction(&wt_session, NULL);
-                wt_session.commit_transaction(&wt_session, NULL);
+                session->begin_transaction(session.get(), NULL);
+                session->commit_transaction(session.get(), NULL);
             }
             return 1000;
         });

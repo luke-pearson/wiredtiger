@@ -1,6 +1,6 @@
 # Configuration for session_microbenchmarks.
 duration_seconds=5,
-cache_size_mb=250
+cache_size_mb=250,
 workload_manager=
 (
     populate_config=
@@ -10,5 +10,10 @@ workload_manager=
         key_size=1,
         value_size=1,
         thread_count=1,
+    ),
+    custom_config=
+    (
+        op_rate=10s,
+        thread_count=1
     ),
 ),
