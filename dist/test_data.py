@@ -244,6 +244,8 @@ test_config = [
         The duration that the test run will last''', min=0, max=1000000),
     Config('enable_logging', 'false', r'''
         Enables write ahead logs''', type='boolean'),
+    Config('in_memory', 'false', r'''
+        Enables WiredTige's in memory mode.''', type='boolean'),
     Config('reverse_collator', 'false', r'''
         Configure the database files to use the reverse collator.''', type='boolean'),
     Config('statistics_config', '', r'''

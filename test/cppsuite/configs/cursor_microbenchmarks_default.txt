@@ -1,3 +1,13 @@
 # Configuration for cursor_microbenchmarks.
 duration_seconds=5,
-cache_size_mb=250
+cache_size_mb=250,
+validate=false,
+in_memory=true,
+workload_manager=
+(
+    custom_config=
+    (
+        thread_count=1,
+        op_rate=1s
+    ),
+)

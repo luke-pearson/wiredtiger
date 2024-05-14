@@ -52,6 +52,7 @@ const std::string DURATION_SECONDS = "duration_seconds";
 const std::string ENABLED = "enabled";
 const std::string ENABLE_LOGGING = "enable_logging";
 const std::string FREE_SPACE_TARGET_MB = "free_space_target_mb";
+const std::string IN_MEMORY = "in_memory";
 const std::string INSERT_OP_CONFIG = "insert_config";
 const std::string KEY_COUNT_PER_COLLECTION = "key_count_per_collection";
 const std::string KEY_SIZE = "key_size";

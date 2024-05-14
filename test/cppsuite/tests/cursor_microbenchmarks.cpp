@@ -31,27 +31,6 @@
 #include "src/main/test.h"
 
 namespace test_harness {
-/* Defines what data is written to the tracking table for use in custom validation. */
-class operation_tracker_cursor_microbenchmarks : public operation_tracker {
-
-public:
-    operation_tracker_cursor_microbenchmarks(
-      configuration *config, const bool use_compression, timestamp_manager &tsm)
-        : operation_tracker(config, use_compression, tsm)
-    {
-    }
-
-    void
-    set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation,
-      const uint64_t &collection_id, const std::string &key, const std::string &value,
-      wt_timestamp_t ts, scoped_cursor &op_track_cursor) override final
-    {
-        /* You can replace this call to define your own tracking table contents. */
-        operation_tracker::set_tracking_cursor(
-          session, operation, collection_id, key, value, ts, op_track_cursor);
-    }
-};
-
 /*
  * Class that defines operations that do nothing as an example. This shows how database operations
  * can be overridden and customized.
@@ -60,70 +39,19 @@ class cursor_microbenchmarks : public test {
 public:
     cursor_microbenchmarks(const test_args &args) : test(args)
     {
-        init_operation_tracker(
-          new operation_tracker_cursor_microbenchmarks(_config->get_subconfig(OPERATION_TRACKER),
-            _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
-    }
-
-    void
-    run() override final
-    {
-        /* You can remove the call to the base class to fully customize your test. */
-        test::run();
-    }
-
-    void
-    populate(database &, timestamp_manager *, configuration *, operation_tracker *) override final
-    {
-        logger::log_msg(LOG_WARN, "populate: nothing done");
-    }
-
-    void
-    background_compact_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "background_compact_operation: nothing done");
+        init_operation_tracker();
     }
 
     void
     checkpoint_operation(thread_worker *) override final
     {
-        logger::log_msg(LOG_WARN, "checkpoint_operation: nothing done");
+        logger::log_msg(LOG_WARN, "Skipping checkpoint as this a performance test.");
     }
 
     void
     custom_operation(thread_worker *) override final
     {
         logger::log_msg(LOG_WARN, "custom_operation: nothing done");
-    }
-
-    void
-    insert_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "insert_operation: nothing done");
-    }
-
-    void
-    read_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "read_operation: nothing done");
-    }
-
-    void
-    remove_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "remove_operation: nothing done");
-    }
-
-    void
-    update_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "update_operation: nothing done");
-    }
-
-    void
-    validate(bool, const std::string &, const std::string &, database &) override final
-    {
-        logger::log_msg(LOG_WARN, "validate: nothing done");
     }
 };
 

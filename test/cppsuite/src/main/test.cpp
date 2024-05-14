@@ -149,6 +149,10 @@ test::run()
     cache_max_wait_ms = std::chrono::milliseconds(_config->get_int(CACHE_MAX_WAIT_MS));
     db_create_config += ",cache_max_wait_ms=" + std::to_string(cache_max_wait_ms.count());
 
+    /* Set in_memory if the test requires it. */
+    if (_config->get_bool(IN_MEMORY))
+        db_create_config += ",in_memory=true";
+
     /* Add the user supplied wiredtiger open config. */
     db_create_config += "," + _args.wt_open_config;
 
