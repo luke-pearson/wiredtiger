@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/util/execution_timer.h"
+#include "src/util/instruction_counter.h"
 #include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/main/test.h"
@@ -89,7 +89,7 @@ public:
     custom_operation(thread_worker *tc) override final
     {
         WT_SESSION wt_session = *(tc->session);
-        execution_timer bounded_next("begin_commit_transaction_ticks", test::_args.test_name);
+        instruction_counter bounded_next("begin_commit_transaction_ticks", test::_args.test_name);
 
         /* Get the collection to work on. */
         testutil_assert(tc->collection_count == 1);

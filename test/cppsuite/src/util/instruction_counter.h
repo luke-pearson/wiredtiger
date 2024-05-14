@@ -45,10 +45,10 @@ namespace test_harness {
  * Class that measures the average execution time of a given function and adds the stats to the
  * statistics writer when destroyed.
  */
-class execution_timer {
+class instruction_counter {
 public:
-    execution_timer(const std::string id, const std::string &test_name);
-    virtual ~execution_timer();
+    instruction_counter(const std::string id, const std::string &test_name);
+    virtual ~instruction_counter();
 
     /* Calculates the average time and appends the stat to the perf file. */
     void append_stats();
