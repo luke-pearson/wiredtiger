@@ -246,6 +246,9 @@ test_config = [
         Enables write ahead logs''', type='boolean'),
     Config('in_memory', 'false', r'''
         Enables WiredTige's in memory mode.''', type='boolean'),
+    Config('sweep_interval', 10, r'''
+        The frequency that the sweep server will sweep at, defaults to the same as the WiredTiger
+        default.'''),
     Config('reverse_collator', 'false', r'''
         Configure the database files to use the reverse collator.''', type='boolean'),
     Config('statistics_config', '', r'''

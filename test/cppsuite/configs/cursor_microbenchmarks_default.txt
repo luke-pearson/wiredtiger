@@ -3,6 +3,7 @@ duration_seconds=5,
 cache_size_mb=250,
 validate=false,
 in_memory=true,
+sweep_interval=1000,
 workload_manager=
 (
     custom_config=

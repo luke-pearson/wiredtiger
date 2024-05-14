@@ -73,6 +73,7 @@ const std::string STABLE_LAG = "stable_lag";
 const std::string STAT_CACHE_SIZE = "stat_cache_size";
 const std::string STAT_DB_SIZE = "stat_db_size";
 const std::string STATISTICS_CONFIG = "statistics_config";
+const std::string SWEEP_INTERVAL = "sweep_interval";
 const std::string THREAD_COUNT = "thread_count";
 const std::string TRACKING_KEY_FORMAT = "tracking_key_format";
 const std::string TRACKING_VALUE_FORMAT = "tracking_value_format";

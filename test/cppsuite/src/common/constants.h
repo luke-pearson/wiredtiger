@@ -75,6 +75,7 @@ extern const std::string STABLE_LAG;
 extern const std::string STAT_CACHE_SIZE;
 extern const std::string STAT_DB_SIZE;
 extern const std::string STATISTICS_CONFIG;
+extern const std::string SWEEP_INTERVAL;
 extern const std::string THREAD_COUNT;
 extern const std::string TRACKING_KEY_FORMAT;
 extern const std::string TRACKING_VALUE_FORMAT;
