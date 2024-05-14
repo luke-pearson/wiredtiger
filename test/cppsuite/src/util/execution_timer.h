@@ -31,6 +31,14 @@
 
 #include <string>
 
+#include <linux/perf_event.h>
+#include <linux/hw_breakpoint.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+
+#include "src/main/test.h"
+
 namespace test_harness {
 
 /*
@@ -46,18 +54,43 @@ public:
     void append_stats();
 
     /*
-     * Does timing for a given operation and keeps track of how many operations have been executed
-     * as well as total time taken.
+     * Counts hardware instructions used for a given operation and keeps track of how many
+     * operations have been executed.
      */
     template <typename T>
     int
     track(T lambda)
     {
-        auto _start_time = std::chrono::steady_clock::now();
+        struct perf_event_attr pe;
+        memset(&pe, 0, sizeof(pe));
+        pe.type = PERF_TYPE_HARDWARE;
+        pe.size = sizeof(pe);
+        pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+        pe.disabled = 1;
+        pe.exclude_kernel = 1;
+        pe.exclude_hv = 1;
+        int fd = syscall(SYS_perf_event_open, &pe,
+          0,  // pid: calling process/thread
+          -1, // cpu: any CPU
+          -1, // groupd_fd: group with only 1 member
+          0); // flags
+        testutil_assert("Failed to open performance fd");
+        ioctl(fd, PERF_EVENT_IOC_RESET, 0);
+        ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+
         int ret = lambda();
-        auto _end_time = std::chrono::steady_clock::now();
-        _total_time_taken += (_end_time - _start_time).count();
+
+        long long count;
+        size_t bytes_read = read(fd, &count, sizeof(count));
+        testutil_assert(bytes_read == sizeof(count));
+
+        _total_time_taken += count;
         _it_count += 1;
+
+        if (fd > 0) {
+            close(fd);
+        }
+
         return ret;
     }
 

@@ -26,12 +26,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/perf_event.h>
-#include <linux/hw_breakpoint.h>
-#include <sys/syscall.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-
 #include "src/util/execution_timer.h"
 #include "src/common/constants.h"
 #include "src/common/logger.h"
@@ -102,36 +96,13 @@ public:
 
         scoped_session &session = tc->session;
 
-        struct perf_event_attr pe;
-        memset(&pe, 0, sizeof(pe));
-        pe.type = PERF_TYPE_HARDWARE;
-        pe.size = sizeof(pe);
-        pe.config = PERF_COUNT_HW_INSTRUCTIONS;
-        pe.disabled = 1;
-        pe.exclude_kernel = 1;
-        pe.exclude_hv = 1;
-        int fd = syscall(SYS_perf_event_open, &pe,
-          0,  // pid: calling process/thread
-          -1, // cpu: any CPU
-          -1, // groupd_fd: group with only 1 member
-          0); // flags
-        perror("Failed to open fd");
-        ioctl(fd, PERF_EVENT_IOC_RESET, 0);
-        ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
-
         bounded_next.track([&wt_session, &session]() -> int {
-            for (int i = 0; i < 1; i++) {
+            for (int i = 0; i < 100; i++) {
                 session->begin_transaction(session.get(), NULL);
                 session->commit_transaction(session.get(), NULL);
             }
-            return 1000;
+            return 0;
         });
-        long long count;
-        size_t bytes_read = read(fd, &count, sizeof(count));
-        if (bytes_read != sizeof(count)) {
-            logger::log_msg(LOG_ERROR, "Did not read the righth number of bytes");
-        }
-        printf("Instruction Count: %lld\n", count);
     }
 
     void
