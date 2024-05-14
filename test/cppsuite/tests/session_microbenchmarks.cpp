@@ -88,21 +88,23 @@ public:
     void
     custom_operation(thread_worker *tc) override final
     {
-        WT_SESSION wt_session = *(tc->session);
-        instruction_counter bounded_next("begin_commit_transaction_ticks", test::_args.test_name);
+        instruction_counter begin_transaction("begin_transaction_instruction_count", test::_args.test_name);
+        instruction_counter rollback_transaction("rollback_transaction_instruction_count", test::_args.test_name);
 
         /* Get the collection to work on. */
         testutil_assert(tc->collection_count == 1);
 
         scoped_session &session = tc->session;
 
-        bounded_next.track([&wt_session, &session]() -> int {
-            for (int i = 0; i < 100; i++) {
-                session->begin_transaction(session.get(), NULL);
-                session->commit_transaction(session.get(), NULL);
-            }
-            return 0;
-        });
+        /* Test begin and rollback. Average across 100 runs. */
+        for (int i = 0; i < 100; i++) {
+            begin_transaction.track([&session]() -> int {
+                return session->begin_transaction(session.get(), NULL);
+            });
+            rollback_transaction.track([&session]() -> int {
+                return session->rollback_transaction(session.get(), NULL);
+            });
+        }
     }
 
     void
