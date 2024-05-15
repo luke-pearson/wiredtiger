@@ -29,6 +29,7 @@
 #include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/main/test.h"
+#include "src/util/instruction_counter.h"
 
 namespace test_harness {
 /*
@@ -64,9 +65,30 @@ public:
     }
 
     void
-    custom_operation(thread_worker *) override final
+    custom_operation(thread_worker *tc) override final
     {
-        logger::log_msg(LOG_WARN, "custom_operation: nothing done");
+        /* The test expects no more than one collection. */
+        testutil_assert(tc->collection_count == 1);
+
+        /* Assert that we are running in memory. */
+        testutil_assert(_config->get_bool(IN_MEMORY));
+
+        /* Test a single cursor insertion. */
+        instruction_counter cursor_insert_pre_evict("cursor_insert_instruction_count", test::_args.test_name);
+        collection &coll = tc->db.get_collection(0);
+        scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
+        auto key_count = coll.get_key_count();
+        uint64_t i = 0;
+        for (; i < 100; i++) {
+            auto key = tc->pad_string(std::to_string(key_count + i), tc->key_size);
+            cursor->set_key(cursor.get(), key.c_str());
+            cursor->set_value(cursor.get(), "a");
+            auto ret = cursor_insert_pre_evict.track([&cursor]() -> int {
+                return cursor->insert(cursor.get());
+            });
+            testutil_assert(ret == 0);
+        }
+        coll.increase_key_count(i);
     }
 };
 
