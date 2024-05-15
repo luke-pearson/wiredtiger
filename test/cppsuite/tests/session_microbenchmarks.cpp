@@ -165,13 +165,6 @@ public:
             return 0;
         });
 
-        WT_CURSOR *cursorp = NULL;
-        open_cursor_counter.track([&session, &cursor_uri, &cursorp]() -> int {
-            session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
-            return 0;
-        });
-        cursorp->close(cursorp);
-
         session->begin_transaction(session.get(), NULL);
         make_insert(tc, "4");
         auto timestamp = tc->tsm->get_next_ts();
@@ -181,6 +174,14 @@ public:
             return 0;
         });
         session->rollback_transaction(session.get(), NULL);
+
+        session->reconfigure(session.get(), "cache_cursors=false");
+        WT_CURSOR *cursorp = NULL;
+        open_cursor_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+            session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
+            return 0;
+        });
+        cursorp->close(cursorp);
     }
 
     void
