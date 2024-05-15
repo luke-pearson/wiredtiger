@@ -74,21 +74,89 @@ public:
         testutil_assert(_config->get_bool(IN_MEMORY));
 
         /* Test a single cursor insertion. */
-        instruction_counter cursor_insert_pre_evict("cursor_insert_instruction_count", test::_args.test_name);
+        instruction_counter cursor_insert_counter("cursor_insert_instructions", test::_args.test_name);
+        instruction_counter cursor_update_counter("cursor_update_instructions", test::_args.test_name);
+        instruction_counter cursor_modify_counter("cursor_modify_instructions", test::_args.test_name);
+        instruction_counter cursor_remove_counter("cursor_remove_instructions", test::_args.test_name);
+        instruction_counter cursor_reset_counter("cursor_reset_instructions", test::_args.test_name);
+        instruction_counter cursor_search_counter("cursor_search_instructions", test::_args.test_name);
+
         collection &coll = tc->db.get_collection(0);
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
         auto key_count = coll.get_key_count();
-        uint64_t i = 0;
-        for (; i < 100; i++) {
-            auto key = tc->pad_string(std::to_string(key_count + i), tc->key_size);
-            cursor->set_key(cursor.get(), key.c_str());
-            cursor->set_value(cursor.get(), "a");
-            auto ret = cursor_insert_pre_evict.track([&cursor]() -> int {
-                return cursor->insert(cursor.get());
-            });
-            testutil_assert(ret == 0);
-        }
-        coll.increase_key_count(i);
+        tc->session->begin_transaction(tc->session.get(), NULL);
+
+        /* Benchmark cursor->search. */
+        auto key = tc->pad_string(std::to_string(key_count - 1), tc->key_size);
+        cursor->set_key(cursor.get(), key.c_str());
+        auto ret = cursor_search_counter.track([&cursor]() -> int {
+            return cursor->search(cursor.get());
+        });
+        testutil_assert(ret == 0);
+
+        /*
+         * Benchmark cursor->update.
+         *
+         * We need to be careful here, if we don't call search before this we will unintentionally
+         * be benchmarking search + update. Additionally setting a key on the cursor will trigger a
+         * fresh search from the root.
+         */
+        cursor->set_value(cursor.get(), "b");
+        ret = cursor_update_counter.track([&cursor]() -> int {
+            return cursor->update(cursor.get());
+        });
+        testutil_assert(ret == 0);
+
+        /* Re-search. */
+        cursor->set_key(cursor.get(), key.c_str());
+        cursor->search(cursor.get());
+
+        /*
+         * Benchmark cursor->modify. Again we've positioned using a search to avoid searching,
+         * internally.
+         */
+        WT_MODIFY mod;
+        mod.data.data = "c";
+        mod.data.size = 1;
+        mod.offset = 0;
+        mod.size = mod.data.size;
+        ret = cursor_modify_counter.track([&cursor, &mod]() -> int {
+            return cursor->modify(cursor.get(), &mod, 1);
+        });
+        testutil_assert(ret == 0);
+
+        /* Re-search. */
+        testutil_assert(cursor->reconfigure(cursor.get(), "overwrite=true") == 0);
+        cursor->set_key(cursor.get(), key.c_str());
+        testutil_assert(cursor->search(cursor.get()) == 0);
+
+        /*
+         * Benchmark cursor->insert. Provide the overwrite configuration to avoid triggering a
+         * search.
+         */
+        cursor->set_value(cursor.get(), "a");
+        ret = cursor_insert_counter.track([&cursor]() -> int {
+            return cursor->insert(cursor.get());
+        });
+        testutil_assert(ret == 0);
+
+        cursor->set_key(cursor.get(), key.c_str());
+        testutil_assert(cursor->search(cursor.get()) == 0);
+
+        /*
+         * Benchmark cursor->remove. Again we've positioned using a search to avoid searching,
+         * internally.
+         */
+        ret = cursor_remove_counter.track([&cursor]() -> int {
+            return cursor->remove(cursor.get());
+        });
+        testutil_assert(ret == 0);
+
+        /* Benchmark cursor->reset. */
+        ret = cursor_reset_counter.track([&cursor]() -> int {
+            return cursor->reset(cursor.get());
+        });
+        testutil_assert(ret == 0);
     }
 };
 
