@@ -32,26 +32,6 @@
 #include "src/main/test.h"
 
 namespace test_harness {
-/* Defines what data is written to the tracking table for use in custom validation. */
-class operation_tracker_session_microbenchmarks : public operation_tracker {
-
-public:
-    operation_tracker_session_microbenchmarks(
-      configuration *config, const bool use_compression, timestamp_manager &tsm)
-        : operation_tracker(config, use_compression, tsm)
-    {
-    }
-
-    void
-    set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation,
-      const uint64_t &collection_id, const std::string &key, const std::string &value,
-      wt_timestamp_t ts, scoped_cursor &op_track_cursor) override final
-    {
-        /* You can replace this call to define your own tracking table contents. */
-        operation_tracker::set_tracking_cursor(
-          session, operation, collection_id, key, value, ts, op_track_cursor);
-    }
-};
 
 static void
 make_insert(thread_worker *tc, const std::string &id)
@@ -77,28 +57,13 @@ class session_microbenchmarks : public test {
 public:
     session_microbenchmarks(const test_args &args) : test(args)
     {
-        init_operation_tracker(
-          new operation_tracker_session_microbenchmarks(_config->get_subconfig(OPERATION_TRACKER),
-            _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
-    }
-
-    void
-    run() override final
-    {
-        /* You can remove the call to the base class to fully customize your test. */
-        test::run();
-    }
-
-    void
-    background_compact_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "background_compact_operation: nothing done");
+        init_operation_tracker(NULL);
     }
 
     void
     checkpoint_operation(thread_worker *) override final
     {
-        logger::log_msg(LOG_WARN, "checkpoint_operation: nothing done");
+        logger::log_msg(LOG_WARN, "checkpoint_operation: not done as this is a performance test");
     }
 
     void
@@ -129,101 +94,77 @@ public:
 
         scoped_session &session = tc->session;
 
-        begin_transaction_counter.track([&wt_session, &session]() -> int {
-            session->begin_transaction(session.get(), NULL);
-            return 0;
+        int result = begin_transaction_counter.track([&wt_session, &session]() -> int {
+            return session->begin_transaction(session.get(), NULL);
         });
+        testutil_assert(result == 0);
 
         make_insert(tc, "1");
 
-        commit_transaction_counter.track([&wt_session, &session]() -> int {
-            session->commit_transaction(session.get(), NULL);
-            return 0;
+        result = commit_transaction_counter.track([&wt_session, &session]() -> int {
+            return session->commit_transaction(session.get(), NULL);
         });
+        testutil_assert(result == 0);
 
-        session->begin_transaction(session.get(), NULL);
+        result = session->begin_transaction(session.get(), NULL);
+        testutil_assert(result == 0);
 
-        make_insert(tc, "2");
-
-        rollback_trancation_counter.track([&wt_session, &session]() -> int {
-            session->rollback_transaction(session.get(), NULL);
-            return 0;
+        result = rollback_trancation_counter.track([&wt_session, &session]() -> int {
+            return session->rollback_transaction(session.get(), NULL);
         });
+        testutil_assert(result == 0);
 
         std::string prepare_timestamp = tc->tsm->decimal_to_hex(tc->tsm->get_next_ts());
-        session->begin_transaction(session.get(), NULL);
+        result = session->begin_transaction(session.get(), NULL);
+        testutil_assert(result == 0);
         make_insert(tc, "3");
-        prepare_transaction_counter.track([&session, &prepare_timestamp]() -> int {
-            session->prepare_transaction(
+        result = prepare_transaction_counter.track([&session, &prepare_timestamp]() -> int {
+            return session->prepare_transaction(
               session.get(), ("prepare_timestamp=" + prepare_timestamp).c_str());
-            return 0;
         });
+        // testutil_assert(result == 0);
 
         std::string commit_timestamp = tc->tsm->decimal_to_hex(tc->tsm->get_next_ts());
 
-        commit_after_prepare_transaction_counter.track([&session, &commit_timestamp]() -> int {
-            session->commit_transaction(session.get(),
-              ("commit_timestamp=" + commit_timestamp + ",durable_timestamp=" + commit_timestamp)
-                .c_str());
-            return 0;
-        });
+        result =
+          commit_after_prepare_transaction_counter.track([&session, &commit_timestamp]() -> int {
+              return session->commit_transaction(session.get(),
+                ("commit_timestamp=" + commit_timestamp + ",durable_timestamp=" + commit_timestamp)
+                  .c_str());
+          });
+        // testutil_assert(result == 0);
 
-        session->begin_transaction(session.get(), NULL);
-        make_insert(tc, "4");
+        result = session->begin_transaction(session.get(), NULL);
+        testutil_assert(result == 0);
         auto timestamp = tc->tsm->get_next_ts();
 
-        timestamp_transaction_uint_counter.track([&session, &timestamp]() -> int {
-            session->timestamp_transaction_uint(session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
-            return 0;
+        result = timestamp_transaction_uint_counter.track([&session, &timestamp]() -> int {
+            return session->timestamp_transaction_uint(
+              session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
         });
-        session->rollback_transaction(session.get(), NULL);
+        testutil_assert(result == 0);
+
+        result = session->rollback_transaction(session.get(), NULL);
+        testutil_assert(result == 0);
 
         WT_CURSOR *cursorp = NULL;
-        open_cursor_cached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
-            session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
-            return 0;
+        result = open_cursor_cached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+            return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
         });
+        testutil_assert(result == 0);
+
         cursorp->close(cursorp);
         cursorp = NULL;
 
         session->reconfigure(session.get(), "cache_cursors=false");
 
-        open_cursor_uncached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
-            session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
-            return 0;
+        result = open_cursor_uncached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+            return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
         });
+        testutil_assert(result == 0);
+
         cursorp->close(cursorp);
         cursorp = NULL;
-    }
-
-    void
-    insert_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "insert_operation: nothing done");
-    }
-
-    void
-    read_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "read_operation: nothing done");
-    }
-
-    void
-    remove_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "remove_operation: nothing done");
-    }
-
-    void
-    update_operation(thread_worker *) override final
-    {
-        logger::log_msg(LOG_WARN, "update_operation: nothing done");
-    }
-
-    void
-    validate(bool, const std::string &, const std::string &, database &) override final
-    {
-        logger::log_msg(LOG_WARN, "validate: nothing done");
     }
 };
 

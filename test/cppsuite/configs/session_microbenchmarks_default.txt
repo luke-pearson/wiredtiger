@@ -1,6 +1,9 @@
 # Configuration for session_microbenchmarks.
 duration_seconds=5,
-cache_size_mb=250,
+cache_size_mb=2000,
+validate=false,
+in_memory=true,
+sweep_interval=1000,
 workload_manager=
 (
     populate_config=
@@ -17,3 +20,7 @@ workload_manager=
         thread_count=1
     ),
 ),
+operation_tracker=
+(
+    enabled=false,
+)
