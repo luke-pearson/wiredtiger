@@ -116,7 +116,10 @@ public:
 
         instruction_counter commit_after_prepare_transaction_counter(
           "commit_after_prepare_instructions", test::_args.test_name);
-        instruction_counter open_cursor_counter("open_cursor_instructions", test::_args.test_name);
+        instruction_counter open_cursor_cached_counter(
+          "open_cursor_cached_instructions", test::_args.test_name);
+        instruction_counter open_cursor_uncached_counter(
+          "open_cursor_uncached_instructions", test::_args.test_name);
         instruction_counter timestamp_transaction_uint_counter(
           "timestamp_transaction_uint_instructions", test::_args.test_name);
         std::string cursor_uri = tc->db.get_collection(0).name;
@@ -175,13 +178,22 @@ public:
         });
         session->rollback_transaction(session.get(), NULL);
 
-        session->reconfigure(session.get(), "cache_cursors=false");
         WT_CURSOR *cursorp = NULL;
-        open_cursor_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+        open_cursor_cached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
             session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
             return 0;
         });
         cursorp->close(cursorp);
+        cursorp = NULL;
+
+        session->reconfigure(session.get(), "cache_cursors=false");
+
+        open_cursor_uncached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+            session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
+            return 0;
+        });
+        cursorp->close(cursorp);
+        cursorp = NULL;
     }
 
     void
