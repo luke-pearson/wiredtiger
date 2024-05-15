@@ -53,6 +53,22 @@ public:
     }
 };
 
+static void
+make_insert(thread_worker *tc, const std::string &id)
+{
+    std::string cursor_uri = tc->db.get_collection(0).name;
+
+    auto cursor = tc->session.open_scoped_cursor(cursor_uri);
+    cursor->set_key(cursor.get(), "key" + id);
+    cursor->set_value(cursor.get(), "value1" + id);
+    int ret = cursor->insert(cursor.get());
+
+    if (ret != 0) {
+        logger::log_msg(
+          LOG_ERROR, "session_microbenchmarks: expected insert id " + id + " to succeed");
+    }
+}
+
 /*
  * Class that defines operations that do nothing as an example. This shows how database operations
  * can be overridden and customized.
@@ -88,23 +104,83 @@ public:
     void
     custom_operation(thread_worker *tc) override final
     {
-        instruction_counter begin_transaction("begin_transaction_instruction_count", test::_args.test_name);
-        instruction_counter rollback_transaction("rollback_transaction_instruction_count", test::_args.test_name);
+        WT_SESSION wt_session = *(tc->session);
+        instruction_counter begin_transaction_counter(
+          "begin_transaction_instructions", test::_args.test_name);
+        instruction_counter commit_transaction_counter(
+          "commit_transaction_instructions", test::_args.test_name);
+        instruction_counter rollback_trancation_counter(
+          "rollback_trancation_instructions", test::_args.test_name);
+        instruction_counter prepare_transaction_counter(
+          "prepare_transaction_instructions", test::_args.test_name);
+
+        instruction_counter commit_after_prepare_transaction_counter(
+          "commit_after_prepare_instructions", test::_args.test_name);
+        instruction_counter open_cursor_counter("open_cursor_instructions", test::_args.test_name);
+        instruction_counter timestamp_transaction_uint_counter(
+          "timestamp_transaction_uint_instructions", test::_args.test_name);
+        std::string cursor_uri = tc->db.get_collection(0).name;
 
         /* Get the collection to work on. */
         testutil_assert(tc->collection_count == 1);
 
         scoped_session &session = tc->session;
 
-        /* Test begin and rollback. Average across 100 runs. */
-        for (int i = 0; i < 100; i++) {
-            begin_transaction.track([&session]() -> int {
-                return session->begin_transaction(session.get(), NULL);
-            });
-            rollback_transaction.track([&session]() -> int {
-                return session->rollback_transaction(session.get(), NULL);
-            });
-        }
+        begin_transaction_counter.track([&wt_session, &session]() -> int {
+            session->begin_transaction(session.get(), NULL);
+            return 0;
+        });
+
+        make_insert(tc, "1");
+
+        commit_transaction_counter.track([&wt_session, &session]() -> int {
+            session->commit_transaction(session.get(), NULL);
+            return 0;
+        });
+
+        session->begin_transaction(session.get(), NULL);
+
+        make_insert(tc, "2");
+
+        rollback_trancation_counter.track([&wt_session, &session]() -> int {
+            session->rollback_transaction(session.get(), NULL);
+            return 0;
+        });
+
+        std::string prepare_timestamp = tc->tsm->decimal_to_hex(tc->tsm->get_next_ts());
+        session->begin_transaction(session.get(), NULL);
+        make_insert(tc, "3");
+        prepare_transaction_counter.track([&session, &prepare_timestamp]() -> int {
+            session->prepare_transaction(
+              session.get(), ("prepare_timestamp=" + prepare_timestamp).c_str());
+            return 0;
+        });
+
+        std::string commit_timestamp = tc->tsm->decimal_to_hex(tc->tsm->get_next_ts());
+
+        commit_after_prepare_transaction_counter.track([&session, &commit_timestamp]() -> int {
+            session->commit_transaction(session.get(),
+              ("commit_timestamp=" + commit_timestamp + ",durable_timestamp=" + commit_timestamp)
+                .c_str());
+            return 0;
+        });
+
+        WT_CURSOR *cursorp = NULL;
+        open_cursor_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+            session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
+            return 0;
+        });
+        cursorp->close(cursorp);
+
+        session->begin_transaction(session.get(), NULL);
+        make_insert(tc, "4");
+        auto timestamp = tc->tsm->get_next_ts();
+
+        timestamp_transaction_uint_counter.track([&session, &timestamp]() -> int {
+            session->timestamp_transaction_uint(session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
+            return 0;
+        });
+        session->rollback_transaction(session.get(), NULL);
     }
 
     void
