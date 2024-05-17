@@ -26,7 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/util/instruction_counter.h"
+#include "src/util/execution_timer.h"
 #include "src/main/test.h"
 
 using namespace test_harness;
@@ -44,7 +44,7 @@ public:
     }
 
     static void
-    set_bound_key_lower(scoped_cursor &cursor, instruction_counter &timer, const char *cfg)
+    set_bound_key_lower(scoped_cursor &cursor, execution_timer &timer, const char *cfg)
     {
         std::string lower_bound(1, ('0' - 1));
         cursor->set_key(cursor.get(), lower_bound.c_str());
@@ -55,7 +55,7 @@ public:
     }
 
     static void
-    set_bound_key_upper(scoped_cursor &cursor, instruction_counter &timer, const char *cfg)
+    set_bound_key_upper(scoped_cursor &cursor, execution_timer &timer, const char *cfg)
     {
         std::string upper_bound(1, ('9' + 1));
         cursor->set_key(cursor.get(), upper_bound.c_str());
@@ -81,13 +81,13 @@ public:
           conn->compile_configuration(conn, "WT_CURSOR.bound", "bound=upper", &compiled_ptr_upper));
 
         /* Initialize the different timers for each function. */
-        instruction_counter bounded_next("bounded_next_ticks", test::_args.test_name);
-        instruction_counter bounded_prev("bounded_prev_ticks", test::_args.test_name);
-        instruction_counter default_next("default_next_ticks", test::_args.test_name);
-        instruction_counter default_prev("default_prev_ticks", test::_args.test_name);
-        instruction_counter regular_config_timer(
+        execution_timer bounded_next("bounded_next_ticks", test::_args.test_name);
+        execution_timer bounded_prev("bounded_prev_ticks", test::_args.test_name);
+        execution_timer default_next("default_next_ticks", test::_args.test_name);
+        execution_timer default_prev("default_prev_ticks", test::_args.test_name);
+        execution_timer regular_config_timer(
           "set_bounds non-compiled ticks", test::_args.test_name);
-        instruction_counter compiled_config_timer(
+        execution_timer compiled_config_timer(
           "set_bounds compiled ticks", test::_args.test_name);
 
         /* Get the collection to work on. */
@@ -130,9 +130,8 @@ public:
             }
 
             /* Advance the cursors one position. */
-            int test_closure;
-            auto range_ret_next = bounded_next.track([&next_range_cursor, &test_closure]() -> int {
-                return test_closure = next_range_cursor->next(next_range_cursor.get());
+            auto range_ret_next = bounded_next.track([&next_range_cursor]() -> int {
+                return next_range_cursor->next(next_range_cursor.get());
             });
             auto ret_next = default_next.track(
               [&next_cursor]() -> int { return next_cursor->next(next_cursor.get()); });

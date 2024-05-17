@@ -26,12 +26,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "instruction_counter.h"
+#include "execution_timer.h"
 
 #include "src/component/metrics_writer.h"
 
 namespace test_harness {
-instruction_counter::instruction_counter(const std::string id, const std::string &test_name)
+execution_timer::execution_timer(const std::string id, const std::string &test_name)
     : _id(id), _test_name(test_name), _it_count(0), _total_time_taken(0)
 {
     memset(&_pe, 0, sizeof(_pe));
@@ -44,14 +44,14 @@ instruction_counter::instruction_counter(const std::string id, const std::string
 }
 
 void
-instruction_counter::append_stats()
+execution_timer::append_stats()
 {
     uint64_t avg = (uint64_t)_total_time_taken / _it_count;
     std::string stat = "{\"name\":\"" + _id + "\",\"value\":" + std::to_string(avg) + "}";
     metrics_writer::instance().add_stat(stat);
 }
 
-instruction_counter::~instruction_counter()
+execution_timer::~execution_timer()
 {
     if (_it_count != 0)
         append_stats();

@@ -29,7 +29,7 @@
 #include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/main/test.h"
-#include "src/util/instruction_counter.h"
+#include "src/util/execution_timer.h"
 
 namespace test_harness {
 /*
@@ -74,12 +74,12 @@ public:
         testutil_assert(_config->get_bool(IN_MEMORY));
 
         /* Test a single cursor insertion. */
-        instruction_counter cursor_insert_counter("cursor_insert_instructions", test::_args.test_name);
-        instruction_counter cursor_update_counter("cursor_update_instructions", test::_args.test_name);
-        instruction_counter cursor_modify_counter("cursor_modify_instructions", test::_args.test_name);
-        instruction_counter cursor_remove_counter("cursor_remove_instructions", test::_args.test_name);
-        instruction_counter cursor_reset_counter("cursor_reset_instructions", test::_args.test_name);
-        instruction_counter cursor_search_counter("cursor_search_instructions", test::_args.test_name);
+        execution_timer cursor_insert_counter("cursor_insert_instructions", test::_args.test_name);
+        execution_timer cursor_update_counter("cursor_update_instructions", test::_args.test_name);
+        execution_timer cursor_modify_counter("cursor_modify_instructions", test::_args.test_name);
+        execution_timer cursor_remove_counter("cursor_remove_instructions", test::_args.test_name);
+        execution_timer cursor_reset_counter("cursor_reset_instructions", test::_args.test_name);
+        execution_timer cursor_search_counter("cursor_search_instructions", test::_args.test_name);
 
         collection &coll = tc->db.get_collection(0);
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);

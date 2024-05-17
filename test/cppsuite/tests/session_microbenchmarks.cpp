@@ -26,13 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "src/util/instruction_counter.h"
+#include "src/util/execution_timer.h"
 #include "src/common/constants.h"
 #include "src/common/logger.h"
 #include "src/main/test.h"
 
 namespace test_harness {
 
+/* Insert a key into the database. */
 static void
 make_insert(thread_worker *tc, const std::string &id)
 {
@@ -41,12 +42,7 @@ make_insert(thread_worker *tc, const std::string &id)
     auto cursor = tc->session.open_scoped_cursor(cursor_uri);
     cursor->set_key(cursor.get(), "key" + id);
     cursor->set_value(cursor.get(), "value1" + id);
-    int ret = cursor->insert(cursor.get());
-
-    if (ret != 0) {
-        logger::log_msg(
-          LOG_ERROR, "session_microbenchmarks: expected insert id " + id + " to succeed");
-    }
+    testutil_assert(cursor->insert(cursor.get()));
 }
 
 /*
@@ -69,84 +65,60 @@ public:
     void
     custom_operation(thread_worker *tc) override final
     {
-        WT_SESSION wt_session = *(tc->session);
-        instruction_counter begin_transaction_counter(
-          "begin_transaction_instructions", test::_args.test_name);
-        instruction_counter commit_transaction_counter(
-          "commit_transaction_instructions", test::_args.test_name);
-        instruction_counter rollback_trancation_counter(
-          "rollback_trancation_instructions", test::_args.test_name);
-        instruction_counter prepare_transaction_counter(
-          "prepare_transaction_instructions", test::_args.test_name);
+        /* Assert there is only one collection. */
+        testutil_assert(tc->collection_count == 1);
 
-        instruction_counter commit_after_prepare_transaction_counter(
-          "commit_after_prepare_instructions", test::_args.test_name);
-        instruction_counter open_cursor_cached_counter(
+        /* Create the necessary timers. */
+        execution_timer begin_transaction_counter(
+          "begin_transaction_instructions", test::_args.test_name);
+        execution_timer commit_transaction_counter(
+          "commit_transaction_instructions", test::_args.test_name);
+        execution_timer rollback_trancation_counter(
+          "rollback_trancation_instructions", test::_args.test_name);
+        execution_timer open_cursor_cached_counter(
           "open_cursor_cached_instructions", test::_args.test_name);
-        instruction_counter open_cursor_uncached_counter(
+        execution_timer open_cursor_uncached_counter(
           "open_cursor_uncached_instructions", test::_args.test_name);
-        instruction_counter timestamp_transaction_uint_counter(
+        execution_timer timestamp_transaction_uint_counter(
           "timestamp_transaction_uint_instructions", test::_args.test_name);
         std::string cursor_uri = tc->db.get_collection(0).name;
 
-        /* Get the collection to work on. */
-        testutil_assert(tc->collection_count == 1);
-
+        /*
+         * Time begin transaction and commit transaction. In order for commit to do work we need at
+         * least one modification on the transaction.
+         */
         scoped_session &session = tc->session;
-
-        int result = begin_transaction_counter.track([&wt_session, &session]() -> int {
+        int result = begin_transaction_counter.track([&session]() -> int {
             return session->begin_transaction(session.get(), NULL);
         });
         testutil_assert(result == 0);
 
+        /* Add the modification. */
         make_insert(tc, "1");
 
-        result = commit_transaction_counter.track([&wt_session, &session]() -> int {
+        result = commit_transaction_counter.track([&session]() -> int {
             return session->commit_transaction(session.get(), NULL);
         });
         testutil_assert(result == 0);
 
-        result = session->begin_transaction(session.get(), NULL);
-        testutil_assert(result == 0);
-
-        result = rollback_trancation_counter.track([&wt_session, &session]() -> int {
+        /* Time rollback transaction. */
+        testutil_assert(session->begin_transaction(session.get(), NULL));
+        result = rollback_trancation_counter.track([&session]() -> int {
             return session->rollback_transaction(session.get(), NULL);
         });
         testutil_assert(result == 0);
 
-        std::string prepare_timestamp = tc->tsm->decimal_to_hex(tc->tsm->get_next_ts());
-        result = session->begin_transaction(session.get(), NULL);
-        testutil_assert(result == 0);
-        make_insert(tc, "3");
-        result = prepare_transaction_counter.track([&session, &prepare_timestamp]() -> int {
-            return session->prepare_transaction(
-              session.get(), ("prepare_timestamp=" + prepare_timestamp).c_str());
-        });
-        // testutil_assert(result == 0);
-
-        std::string commit_timestamp = tc->tsm->decimal_to_hex(tc->tsm->get_next_ts());
-
-        result =
-          commit_after_prepare_transaction_counter.track([&session, &commit_timestamp]() -> int {
-              return session->commit_transaction(session.get(),
-                ("commit_timestamp=" + commit_timestamp + ",durable_timestamp=" + commit_timestamp)
-                  .c_str());
-          });
-        // testutil_assert(result == 0);
-
-        result = session->begin_transaction(session.get(), NULL);
-        testutil_assert(result == 0);
+        /* Time timestamp transaction_uint. */
+        testutil_assert(session->begin_transaction(session.get(), NULL));
         auto timestamp = tc->tsm->get_next_ts();
-
         result = timestamp_transaction_uint_counter.track([&session, &timestamp]() -> int {
             return session->timestamp_transaction_uint(
               session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
         });
         testutil_assert(result == 0);
+        testutil_assert(session->rollback_transaction(session.get(), NULL));
 
-        result = session->rollback_transaction(session.get(), NULL);
-        testutil_assert(result == 0);
-
+        /* Time opening a cursor, this should use a cached cursor. */
         WT_CURSOR *cursorp = NULL;
         result = open_cursor_cached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
             return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
@@ -156,8 +128,8 @@ public:
         cursorp->close(cursorp);
         cursorp = NULL;
 
+        /* Time opening a cursor without using the cache. */
         session->reconfigure(session.get(), "cache_cursors=false");
-
         result = open_cursor_uncached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
             return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
         });
