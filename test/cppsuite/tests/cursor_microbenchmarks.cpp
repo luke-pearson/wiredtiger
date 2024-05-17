@@ -74,12 +74,12 @@ public:
         testutil_assert(_config->get_bool(IN_MEMORY));
 
         /* Test a single cursor insertion. */
-        execution_timer cursor_insert_counter("cursor_insert_instructions", test::_args.test_name);
-        execution_timer cursor_update_counter("cursor_update_instructions", test::_args.test_name);
-        execution_timer cursor_modify_counter("cursor_modify_instructions", test::_args.test_name);
-        execution_timer cursor_remove_counter("cursor_remove_instructions", test::_args.test_name);
-        execution_timer cursor_reset_counter("cursor_reset_instructions", test::_args.test_name);
-        execution_timer cursor_search_counter("cursor_search_instructions", test::_args.test_name);
+        execution_timer cursor_insert_timer("cursor_insert", test::_args.test_name);
+        execution_timer cursor_update_timer("cursor_update", test::_args.test_name);
+        execution_timer cursor_modify_timer("cursor_modify", test::_args.test_name);
+        execution_timer cursor_remove_timer("cursor_remove", test::_args.test_name);
+        execution_timer cursor_reset_timer("cursor_reset", test::_args.test_name);
+        execution_timer cursor_search_timer("cursor_search", test::_args.test_name);
 
         collection &coll = tc->db.get_collection(0);
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
@@ -89,9 +89,8 @@ public:
         /* Benchmark cursor->search. */
         auto key = tc->pad_string(std::to_string(key_count - 1), tc->key_size);
         cursor->set_key(cursor.get(), key.c_str());
-        auto ret = cursor_search_counter.track([&cursor]() -> int {
-            return cursor->search(cursor.get());
-        });
+        auto ret =
+          cursor_search_timer.track([&cursor]() -> int { return cursor->search(cursor.get()); });
         testutil_assert(ret == 0);
 
         /*
@@ -102,9 +101,8 @@ public:
          * fresh search from the root.
          */
         cursor->set_value(cursor.get(), "b");
-        ret = cursor_update_counter.track([&cursor]() -> int {
-            return cursor->update(cursor.get());
-        });
+        ret =
+          cursor_update_timer.track([&cursor]() -> int { return cursor->update(cursor.get()); });
         testutil_assert(ret == 0);
 
         /* Re-search. */
@@ -120,9 +118,8 @@ public:
         mod.data.size = 1;
         mod.offset = 0;
         mod.size = mod.data.size;
-        ret = cursor_modify_counter.track([&cursor, &mod]() -> int {
-            return cursor->modify(cursor.get(), &mod, 1);
-        });
+        ret = cursor_modify_timer.track(
+          [&cursor, &mod]() -> int { return cursor->modify(cursor.get(), &mod, 1); });
         testutil_assert(ret == 0);
 
         /* Re-search. */
@@ -135,9 +132,8 @@ public:
          * search.
          */
         cursor->set_value(cursor.get(), "a");
-        ret = cursor_insert_counter.track([&cursor]() -> int {
-            return cursor->insert(cursor.get());
-        });
+        ret =
+          cursor_insert_timer.track([&cursor]() -> int { return cursor->insert(cursor.get()); });
         testutil_assert(ret == 0);
 
         cursor->set_key(cursor.get(), key.c_str());
@@ -147,15 +143,12 @@ public:
          * Benchmark cursor->remove. Again we've positioned using a search to avoid searching,
          * internally.
          */
-        ret = cursor_remove_counter.track([&cursor]() -> int {
-            return cursor->remove(cursor.get());
-        });
+        ret =
+          cursor_remove_timer.track([&cursor]() -> int { return cursor->remove(cursor.get()); });
         testutil_assert(ret == 0);
 
         /* Benchmark cursor->reset. */
-        ret = cursor_reset_counter.track([&cursor]() -> int {
-            return cursor->reset(cursor.get());
-        });
+        ret = cursor_reset_timer.track([&cursor]() -> int { return cursor->reset(cursor.get()); });
         testutil_assert(ret == 0);
     }
 };

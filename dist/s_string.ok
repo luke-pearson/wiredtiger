@@ -509,6 +509,7 @@ bbuilddir
 bcr
 bd
 beginthreadex
+benchmarking
 binutils
 bitcnt
 bitfield
@@ -614,6 +615,7 @@ countp
 cp
 cpp
 cppsuite
+cpu
 cpuid
 crc
 crypto
@@ -824,6 +826,7 @@ gostring
 gostruct
 goto
 goutf
+groupd
 gte
 handleops
 handlep
@@ -1349,6 +1352,7 @@ umount
 unallocated
 unbare
 unbuffered
+uncached
 unconfigured
 uncustomized
 undef

@@ -69,17 +69,17 @@ public:
         testutil_assert(tc->collection_count == 1);
 
         /* Create the necessary timers. */
-        execution_timer begin_transaction_counter(
+        execution_timer begin_transaction_timer(
           "begin_transaction_instructions", test::_args.test_name);
-        execution_timer commit_transaction_counter(
+        execution_timer commit_transaction_timer(
           "commit_transaction_instructions", test::_args.test_name);
-        execution_timer rollback_trancation_counter(
-          "rollback_trancation_instructions", test::_args.test_name);
-        execution_timer open_cursor_cached_counter(
+        execution_timer rollback_transaction_timer(
+          "rollback_transaction_instructions", test::_args.test_name);
+        execution_timer open_cursor_cached_timer(
           "open_cursor_cached_instructions", test::_args.test_name);
-        execution_timer open_cursor_uncached_counter(
+        execution_timer open_cursor_uncached_timer(
           "open_cursor_uncached_instructions", test::_args.test_name);
-        execution_timer timestamp_transaction_uint_counter(
+        execution_timer timestamp_transaction_uint_timer(
           "timestamp_transaction_uint_instructions", test::_args.test_name);
         std::string cursor_uri = tc->db.get_collection(0).name;
 
@@ -88,30 +88,27 @@ public:
          * least one modification on the transaction.
          */
         scoped_session &session = tc->session;
-        int result = begin_transaction_counter.track([&session]() -> int {
-            return session->begin_transaction(session.get(), NULL);
-        });
+        int result = begin_transaction_timer.track(
+          [&session]() -> int { return session->begin_transaction(session.get(), NULL); });
         testutil_assert(result == 0);
 
         /* Add the modification. */
         make_insert(tc, "1");
 
-        result = commit_transaction_counter.track([&session]() -> int {
-            return session->commit_transaction(session.get(), NULL);
-        });
+        result = commit_transaction_timer.track(
+          [&session]() -> int { return session->commit_transaction(session.get(), NULL); });
         testutil_assert(result == 0);
 
         /* Time rollback transaction. */
         testutil_assert(session->begin_transaction(session.get(), NULL));
-        result = rollback_trancation_counter.track([&session]() -> int {
-            return session->rollback_transaction(session.get(), NULL);
-        });
+        result = rollback_transaction_timer.track(
+          [&session]() -> int { return session->rollback_transaction(session.get(), NULL); });
         testutil_assert(result == 0);
 
         /* Time timestamp transaction_uint. */
         testutil_assert(session->begin_transaction(session.get(), NULL));
         auto timestamp = tc->tsm->get_next_ts();
-        result = timestamp_transaction_uint_counter.track([&session, &timestamp]() -> int {
+        result = timestamp_transaction_uint_timer.track([&session, &timestamp]() -> int {
             return session->timestamp_transaction_uint(
               session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
         });
@@ -120,7 +117,7 @@ public:
 
         /* Time opening a cursor, this should use a cached cursor. */
         WT_CURSOR *cursorp = NULL;
-        result = open_cursor_cached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+        result = open_cursor_cached_timer.track([&session, &cursor_uri, &cursorp]() -> int {
             return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
         });
         testutil_assert(result == 0);
@@ -130,7 +127,7 @@ public:
 
         /* Time opening a cursor without using the cache. */
         session->reconfigure(session.get(), "cache_cursors=false");
-        result = open_cursor_uncached_counter.track([&session, &cursor_uri, &cursorp]() -> int {
+        result = open_cursor_uncached_timer.track([&session, &cursor_uri, &cursorp]() -> int {
             return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
         });
         testutil_assert(result == 0);
