@@ -42,7 +42,7 @@ make_insert(thread_worker *tc, const std::string &id)
     auto cursor = tc->session.open_scoped_cursor(cursor_uri);
     cursor->set_key(cursor.get(), "key" + id);
     cursor->set_value(cursor.get(), "value1" + id);
-    testutil_assert(cursor->insert(cursor.get()));
+    testutil_assert(cursor->insert(cursor.get()) == 0);
 }
 
 /*
@@ -69,18 +69,15 @@ public:
         testutil_assert(tc->collection_count == 1);
 
         /* Create the necessary timers. */
-        execution_timer begin_transaction_timer(
-          "begin_transaction_instructions", test::_args.test_name);
-        execution_timer commit_transaction_timer(
-          "commit_transaction_instructions", test::_args.test_name);
-        execution_timer rollback_transaction_timer(
-          "rollback_transaction_instructions", test::_args.test_name);
+        execution_timer begin_transaction_timer("begin_transaction", test::_args.test_name);
+        execution_timer commit_transaction_timer("commit_transaction", test::_args.test_name);
+        execution_timer rollback_transaction_timer("rollback_transaction", test::_args.test_name);
         execution_timer open_cursor_cached_timer(
-          "open_cursor_cached_instructions", test::_args.test_name);
+          "open_cursor_cached", test::_args.test_name, false);
         execution_timer open_cursor_uncached_timer(
-          "open_cursor_uncached_instructions", test::_args.test_name);
+          "open_cursor_uncached", test::_args.test_name, false);
         execution_timer timestamp_transaction_uint_timer(
-          "timestamp_transaction_uint_instructions", test::_args.test_name);
+          "timestamp_transaction_uint", test::_args.test_name);
         std::string cursor_uri = tc->db.get_collection(0).name;
 
         /*
@@ -88,34 +85,43 @@ public:
          * least one modification on the transaction.
          */
         scoped_session &session = tc->session;
-        int result = begin_transaction_timer.track(
-          [&session]() -> int { return session->begin_transaction(session.get(), NULL); });
-        testutil_assert(result == 0);
+        int result;
+        for (int i = 0; i < 30; i++) {
+            result = begin_transaction_timer.track(
+              [&session]() -> int { return session->begin_transaction(session.get(), NULL); });
+            testutil_assert(result == 0);
 
-        /* Add the modification. */
-        make_insert(tc, "1");
+            /* Add the modification. */
+            make_insert(tc, std::to_string(i + 1));
 
-        result = commit_transaction_timer.track(
-          [&session]() -> int { return session->commit_transaction(session.get(), NULL); });
-        testutil_assert(result == 0);
+            result = commit_transaction_timer.track(
+              [&session]() -> int { return session->commit_transaction(session.get(), NULL); });
+            testutil_assert(result == 0);
+        }
 
         /* Time rollback transaction. */
-        testutil_assert(session->begin_transaction(session.get(), NULL));
-        result = rollback_transaction_timer.track(
-          [&session]() -> int { return session->rollback_transaction(session.get(), NULL); });
-        testutil_assert(result == 0);
+        for (int i = 0; i < 30; i++) {
+            result = begin_transaction_timer.track(
+              [&session]() -> int { return session->begin_transaction(session.get(), NULL); });
+            testutil_assert(result == 0);
+            result = rollback_transaction_timer.track(
+              [&session]() -> int { return session->rollback_transaction(session.get(), NULL); });
+            testutil_assert(result == 0);
+        }
 
         /* Time timestamp transaction_uint. */
-        testutil_assert(session->begin_transaction(session.get(), NULL));
-        auto timestamp = tc->tsm->get_next_ts();
-        result = timestamp_transaction_uint_timer.track([&session, &timestamp]() -> int {
-            return session->timestamp_transaction_uint(
-              session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
-        });
+        testutil_assert(session->begin_transaction(session.get(), NULL) == 0);
+        for (int i = 0; i < 30; i++) {
+            auto timestamp = tc->tsm->get_next_ts();
+            result = timestamp_transaction_uint_timer.track([&session, &timestamp]() -> int {
+                return session->timestamp_transaction_uint(
+                  session.get(), WT_TS_TXN_TYPE_COMMIT, timestamp);
+            });
+        }
         testutil_assert(result == 0);
-        testutil_assert(session->rollback_transaction(session.get(), NULL));
+        testutil_assert(session->rollback_transaction(session.get(), NULL) == 0);
 
-        /* Time opening a cursor, this should use a cached cursor. */
+        /* Count instructions taken to open a cursor, this should use a cached cursor. */
         WT_CURSOR *cursorp = NULL;
         result = open_cursor_cached_timer.track([&session, &cursor_uri, &cursorp]() -> int {
             return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);
@@ -125,7 +131,7 @@ public:
         cursorp->close(cursorp);
         cursorp = NULL;
 
-        /* Time opening a cursor without using the cache. */
+        /* Count instructions taken to open a cursor without using the cache. */
         session->reconfigure(session.get(), "cache_cursors=false");
         result = open_cursor_uncached_timer.track([&session, &cursor_uri, &cursorp]() -> int {
             return session->open_cursor(session.get(), cursor_uri.c_str(), NULL, NULL, &cursorp);

@@ -48,6 +48,7 @@ namespace test_harness {
 class execution_timer {
 public:
     execution_timer(const std::string id, const std::string &test_name);
+    execution_timer(const std::string id, const std::string &test_name, const bool measure_time);
     virtual ~execution_timer();
 
     /* Calculates the average time and appends the stat to the perf file. */
@@ -61,7 +62,6 @@ public:
     int
     track(T lambda)
     {
-        auto start_time = std::chrono::steady_clock::now();
         int fd = syscall(SYS_perf_event_open, &_pe,
           0,  // pid: calling process/thread
           -1, // cpu: any CPU
@@ -70,13 +70,20 @@ public:
         testutil_assert("Failed to open performance fd");
         ioctl(fd, PERF_EVENT_IOC_RESET, 0);
         ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+
+        std::chrono::_V2::steady_clock::time_point start_time;
+        if (_measure_time)
+            start_time = std::chrono::steady_clock::now();
+
         int ret = lambda();
+
         long long count;
         ssize_t bytes_read = read(fd, &count, sizeof(count));
         testutil_assert(bytes_read == sizeof(count));
-        auto end_time = std::chrono::steady_clock::now();
         _total_instruction_count += count;
-        _total_time_taken += (end_time - start_time).count();
+
+        if (_measure_time)
+            _total_time_taken += (std::chrono::steady_clock::now() - start_time).count();
         _it_count += 1;
 
         if (fd > 0) {
@@ -93,5 +100,6 @@ private:
     uint64_t _total_time_taken;
     uint64_t _total_instruction_count;
     struct perf_event_attr _pe;
+    const bool _measure_time;
 };
 } // namespace test_harness

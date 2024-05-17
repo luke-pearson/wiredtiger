@@ -1,5 +1,5 @@
 # Configuration for session_microbenchmarks.
-duration_seconds=5,
+duration_seconds=1,
 cache_size_mb=2000,
 validate=false,
 in_memory=true,

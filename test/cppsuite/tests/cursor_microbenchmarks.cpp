@@ -74,10 +74,10 @@ public:
         testutil_assert(_config->get_bool(IN_MEMORY));
 
         /* Test a single cursor insertion. */
-        execution_timer cursor_insert_timer("cursor_insert", test::_args.test_name);
-        execution_timer cursor_update_timer("cursor_update", test::_args.test_name);
-        execution_timer cursor_modify_timer("cursor_modify", test::_args.test_name);
-        execution_timer cursor_remove_timer("cursor_remove", test::_args.test_name);
+        execution_timer cursor_insert_timer("cursor_insert", test::_args.test_name, false);
+        execution_timer cursor_update_timer("cursor_update", test::_args.test_name, false);
+        execution_timer cursor_modify_timer("cursor_modify", test::_args.test_name, false);
+        execution_timer cursor_remove_timer("cursor_remove", test::_args.test_name, false);
         execution_timer cursor_reset_timer("cursor_reset", test::_args.test_name);
         execution_timer cursor_search_timer("cursor_search", test::_args.test_name);
 
@@ -87,11 +87,22 @@ public:
         tc->session->begin_transaction(tc->session.get(), NULL);
 
         /* Benchmark cursor->search. */
-        auto key = tc->pad_string(std::to_string(key_count - 1), tc->key_size);
+        std::string key;
+        int ret;
+        for (int i = 0; i < 1000; i++) {
+            key = tc->pad_string(std::to_string(key_count - 1), tc->key_size);
+            cursor->set_key(cursor.get(), key.c_str());
+            ret = cursor_search_timer.track(
+              [&cursor]() -> int { return cursor->search(cursor.get()); });
+            testutil_assert(ret == 0);
+            ret =
+              cursor_reset_timer.track([&cursor]() -> int { return cursor->reset(cursor.get()); });
+            testutil_assert(ret == 0);
+        }
+
+        /* Re-search. */
         cursor->set_key(cursor.get(), key.c_str());
-        auto ret =
-          cursor_search_timer.track([&cursor]() -> int { return cursor->search(cursor.get()); });
-        testutil_assert(ret == 0);
+        cursor->search(cursor.get());
 
         /*
          * Benchmark cursor->update.
@@ -145,10 +156,6 @@ public:
          */
         ret =
           cursor_remove_timer.track([&cursor]() -> int { return cursor->remove(cursor.get()); });
-        testutil_assert(ret == 0);
-
-        /* Benchmark cursor->reset. */
-        ret = cursor_reset_timer.track([&cursor]() -> int { return cursor->reset(cursor.get()); });
         testutil_assert(ret == 0);
     }
 };
